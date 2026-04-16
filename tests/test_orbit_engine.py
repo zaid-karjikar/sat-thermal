@@ -1,6 +1,8 @@
+import pytest
 from math import isclose, pi, sqrt, radians, sin
 from sat_thermal import orbit_engine
 from constants import EARTH_RADIUS_M
+from sat_thermal.orbit_engine import Orbit
 
 
 def magnitude(v):
@@ -224,3 +226,69 @@ class TestInCylindricalEclipse:
     def test_sunlit_with_sun_along_y_axis(self):
         """Sunlit check works regardless of sun direction — sun along +y."""
         assert not orbit_engine._in_cylindrical_eclipse((0, 8e6, 0), (0, 1, 0))
+
+
+# -- tests Orbit class -----------------------------------------------------------------------------
+
+
+class TestOrbit:
+
+    # validation -----------------------------------------------------------------------------------
+
+    def test_negative_altitude_raises(self):
+        """Negative altitude raises ValueError."""
+        with pytest.raises(ValueError):
+            Orbit(altitude_km=-100, inclination_deg=0)
+
+    def test_zero_altitude_raises(self):
+        """Zero altitude raises ValueError."""
+        with pytest.raises(ValueError):
+            Orbit(altitude_km=0, inclination_deg=0)
+
+    # radius ---------------------------------------------------------------------------------------
+
+    def test_orbital_radius_m(self):
+        """Orbital radius equals Earth radius plus altitude in meters."""
+        orb = Orbit(altitude_km=420, inclination_deg=0)
+        assert isclose(orb.orbital_radius_m, EARTH_RADIUS_M + 420 * 1000)
+
+    # period ---------------------------------------------------------------------------------------
+
+    def test_iss_period(self):
+        """ISS at 420 km has a period of approximately 92.9 minutes."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        assert isclose(orb.orbital_period_s / 60, 92.9, abs_tol=0.1)
+
+    def test_higher_altitude_longer_period(self):
+        """Higher altitude produces a longer orbital period (Kepler's third law)."""
+        low = Orbit(altitude_km=400, inclination_deg=0)
+        high = Orbit(altitude_km=1000, inclination_deg=0)
+        assert high.orbital_period_s > low.orbital_period_s
+
+    # mean motion ----------------------------------------------------------------------------------
+
+    def test_mean_motion_consistent_with_period(self):
+        """Mean motion equals 2π / period."""
+        orb = Orbit(altitude_km=420, inclination_deg=0)
+        assert isclose(orb.mean_motion_rad_s, 2 * pi / orb.orbital_period_s)
+
+    # sun vector -----------------------------------------------------------------------------------
+
+    def test_default_sun_vector_along_x(self):
+        """Default sun direction (ra=0, dec=0) points along +x."""
+        orb = Orbit(altitude_km=420, inclination_deg=0)
+        assert allclose(orb.sun_vector, (1.0, 0.0, 0.0))
+
+    def test_sun_vector_is_unit_magnitude(self):
+        """Sun vector has unit magnitude for arbitrary ra and dec."""
+        orb = Orbit(altitude_km=420, inclination_deg=0, sun_ra_deg=45, sun_dec_deg=23)
+        assert isclose(magnitude(orb.sun_vector), 1.0)
+
+    # defaults -------------------------------------------------------------------------------------
+
+    def test_defaults_do_not_raise(self):
+        """All optional parameters default to zero without error."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        assert isclose(orb.raan_rad, 0.0)
+        assert isclose(orb.true_anomaly_0_rad, 0.0)
+        assert allclose(orb.sun_vector, (1.0, 0.0, 0.0))

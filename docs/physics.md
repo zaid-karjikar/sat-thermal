@@ -11,6 +11,7 @@ Every assumption made by the model is stated here, with a note on how violating 
 | Symbol | Value | Units | Source |
 |---|---|---|---|
 | $R_\oplus$ | 6378.137 | km | WGS-84 equatorial radius |
+| $\mu_\oplus$ | 398600.4418 | km³/s² | Standard gravitational parameter |
 
 ## 3. Frame definition
 
@@ -24,6 +25,26 @@ The ECI frame is right-handed:
 
 ## 4. Orbit
 
+An orbit is fully specified by an altitude $h$ and five angular elements:
+inclination $i$, RAAN $\Omega$, true anomaly at epoch $\nu_0$,
+and the Sun's right ascension $\alpha$ and declination $\delta$.
+
+**Orbital radius**
+
+$$r = R_\oplus + h$$
+
+**Orbital period**
+
+From Kepler's third law for a circular orbit:
+
+$$T = 2\pi\sqrt{\frac{r^3}{\mu_\oplus}}$$
+
+**Mean motion**
+
+$$n = \frac{2\pi}{T}$$
+
+$n$ is the constant angular rate at which the satellite sweeps its orbit.
+
 ### 4.1 Orbital elements
 
 | Symbol | Parameter | Unit |
@@ -33,6 +54,8 @@ The ECI frame is right-handed:
 | $\Omega$ | RAAN — where the orbit crosses the equator | rad |
 | $\nu_0$ | True anomaly at $t = 0$ | rad |
 | $n$ | Mean motion — angular speed around orbit | rad s⁻¹ |
+| $\alpha_\odot$ | Sun right ascension | rad |
+| $\delta_\odot$ | Sun declination | rad |
 
 ### 4.2 Sun direction
 
