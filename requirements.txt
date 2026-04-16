@@ -1,0 +1,6 @@
+iniconfig==2.3.0
+packaging==26.1
+pluggy==1.6.0
+Pygments==2.20.0
+pytest==9.0.3
+-e git+https://github.com/zaid-karjikar/sat-thermal.git@fe9ce862a7006428712dd050ecb880235a26464d#egg=sat_thermal
