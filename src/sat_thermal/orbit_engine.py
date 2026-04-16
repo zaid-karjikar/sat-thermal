@@ -94,3 +94,25 @@ class Orbit:
         self.mean_motion_rad_s = 2 * pi / self.orbital_period_s
 
         self.sun_vector = _sun_unit_vector(radians(sun_ra_deg), radians(sun_dec_deg))
+
+    def state_at(self, t_s):
+        """
+        Return the orbit state at time t_s seconds after simulation start.
+        """
+        position_m = _position_eci(
+            self.orbital_radius_m,
+            self.inclination_rad,
+            self.raan_rad,
+            self.true_anomaly_0_rad,
+            self.mean_motion_rad_s,
+            t_s,
+        )
+
+        in_eclipse = _in_cylindrical_eclipse(position_m, self.sun_vector)
+
+        return {
+            "t_s": t_s,
+            "position_m": position_m,
+            "sun_vector": self.sun_vector,
+            "in_eclipse": in_eclipse,
+        }

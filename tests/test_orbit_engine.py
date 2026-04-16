@@ -292,3 +292,89 @@ class TestOrbit:
         assert isclose(orb.raan_rad, 0.0)
         assert isclose(orb.true_anomaly_0_rad, 0.0)
         assert allclose(orb.sun_vector, (1.0, 0.0, 0.0))
+
+
+# -- tests state_at() ------------------------------------------------------------------------------
+
+
+class TestStateAt:
+
+    # return type ----------------------------------------------------------------------------------
+
+    def test_returns_dict(self):
+        """state_at returns a dictionary."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        assert isinstance(orb.state_at(0), dict)
+
+    def test_dict_has_expected_keys(self):
+        """state_at returns a dict with t_s, position_m, sun_vector, in_eclipse."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        s = orb.state_at(0)
+        assert set(s.keys()) == {"t_s", "position_m", "sun_vector", "in_eclipse"}
+
+    # t_s ------------------------------------------------------------------------------------------
+
+    def test_t_s_matches_input(self):
+        """t_s in the returned dict matches the argument passed in."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        assert orb.state_at(1234)["t_s"] == 1234
+
+    # position_m -----------------------------------------------------------------------------------
+
+    def test_position_has_three_components(self):
+        """position_m is a three-element tuple."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        assert len(orb.state_at(0)["position_m"]) == 3
+
+    def test_position_radius_constant(self):
+        """Orbital radius is conserved across multiple timesteps."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        for t in [0, 500, 1000, 2000, 3000]:
+            x, y, z = orb.state_at(t)["position_m"]
+            assert isclose(sqrt(x**2 + y**2 + z**2), orb.orbital_radius_m, rel_tol=1e-9)
+
+    def test_position_at_t0_matches_true_anomaly(self):
+        """At t=0 with zero inclination and RAAN, position points along +x."""
+        orb = Orbit(altitude_km=420, inclination_deg=0)
+        x, y, z = orb.state_at(0)["position_m"]
+        assert isclose(x, orb.orbital_radius_m, rel_tol=1e-9)
+        assert isclose(y, 0.0, abs_tol=1e-6)
+        assert isclose(z, 0.0, abs_tol=1e-6)
+
+    # sun_vector -----------------------------------------------------------------------------------
+
+    def test_sun_vector_is_unit_magnitude(self):
+        """Sun vector has unit magnitude."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        sx, sy, sz = orb.state_at(0)["sun_vector"]
+        assert isclose(sqrt(sx**2 + sy**2 + sz**2), 1.0)
+
+    def test_sun_vector_unchanged_across_timesteps(self):
+        """Sun vector is fixed — identical at every timestep."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        v0 = orb.state_at(0)["sun_vector"]
+        for t in [500, 1000, 2000]:
+            assert orb.state_at(t)["sun_vector"] == v0
+
+    # in_eclipse -----------------------------------------------------------------------------------
+
+    def test_eclipse_transition_occurs(self):
+        """Satellite transitions from sunlit to eclipse within one orbit."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        states = [
+            orb.state_at(t)["in_eclipse"]
+            for t in range(0, int(orb.orbital_period_s), 100)
+        ]
+        assert True in states
+        assert False in states
+
+    def test_eclipse_duration_plausible(self):
+        """Eclipse duration is between 25 and 45 minutes for ISS altitude."""
+        orb = Orbit(altitude_km=420, inclination_deg=51.6)
+        eclipse_steps = sum(
+            1
+            for t in range(0, int(orb.orbital_period_s), 100)
+            if orb.state_at(t)["in_eclipse"]
+        )
+        eclipse_duration_s = eclipse_steps * 100
+        assert 25 * 60 <= eclipse_duration_s <= 45 * 60
