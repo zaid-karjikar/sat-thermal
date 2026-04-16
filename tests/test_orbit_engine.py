@@ -1,14 +1,22 @@
-import pytest
-from math import isclose, pi, sqrt
+from math import isclose, pi, sqrt, radians, sin
 from sat_thermal import orbit_engine
 
+
 def magnitude(v):
-    return sqrt(sum(c ** 2 for c in v))
+    return sqrt(sum(c**2 for c in v))
+
 
 def allclose(v, expected, abs_tol=1e-6, rel_tol=1e-9):
-    return all(isclose(a, b, abs_tol=abs_tol, rel_tol=rel_tol) for a, b in zip(v, expected))
+    return all(
+        isclose(a, b, abs_tol=abs_tol, rel_tol=rel_tol) for a, b in zip(v, expected)
+    )
+
+
+iss_orbital_radius = 6_771_000.0  # ISS-altitude circular orbital radius, meters
+iss_mean_motion = 2 * pi / 5560.0  # ISS approximate mean motion, rad/s
 
 # -- tests _sun_unit_vector() -------------------------------------------------------------------------------------------------
+
 
 class TestSunUnitVector:
 
@@ -17,7 +25,7 @@ class TestSunUnitVector:
     def test_vernal_equinox(self):
         """Ra=0, dec=0 points along +x (towards vernal equinox)."""
         assert allclose(orbit_engine._sun_unit_vector(0, 0), (1.0, 0.0, 0.0))
-    
+
     def test_north_pole(self):
         """Dec=+π/2 points along +z regardless of ra."""
         assert allclose(orbit_engine._sun_unit_vector(0, pi / 2), (0.0, 0.0, 1.0))
@@ -33,7 +41,7 @@ class TestSunUnitVector:
     def test_180_deg_ra(self):
         """Ra=π, dec=0 points along -x."""
         assert allclose(orbit_engine._sun_unit_vector(pi, 0), (-1.0, 0.0, 0.0))
-    
+
     # magnitude ---------------------------------------------------------------------------------------------------------------
 
     def test_unit_magnitude_equator(self):
@@ -47,7 +55,7 @@ class TestSunUnitVector:
     def test_unit_magnitude_negative_declination(self):
         """Magnitude is 1 for negative declination."""
         assert isclose(magnitude(orbit_engine._sun_unit_vector(3.5, -0.7)), 1.0)
-    
+
     # symmetry and periodicity ------------------------------------------------------------------------------------------------
 
     def test_symmetry_declination(self):
@@ -63,4 +71,93 @@ class TestSunUnitVector:
         v1 = orbit_engine._sun_unit_vector(0.6, 0.3)
         v2 = orbit_engine._sun_unit_vector(0.6 + 2 * pi, 0.3)
         assert allclose(v1, v2)
-    
+
+
+# -- tests _position_eci() ----------------------------------------------------------------------------------------------------
+
+
+class TestPositionECI:
+
+    # radius conservation -----------------------------------------------------------------------------------------------------
+
+    def test_radius_constant_at_t0(self):
+        """Radius equals input radius at t=0."""
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, 0, 0, 0, iss_mean_motion, 0
+        )
+        assert isclose(magnitude((x, y, z)), iss_orbital_radius)
+
+    def test_radius_conserved_over_time(self):
+        """Radius stays constant across multiple timesteps (rotation preserves length.)"""
+        for t in [0, 500, 1000, 2000, 5000]:
+            x, y, z = orbit_engine._position_eci(
+                iss_orbital_radius, 0, 0, 0, iss_mean_motion, t
+            )
+            assert isclose(magnitude((x, y, z)), iss_orbital_radius, rel_tol=1e-9)
+
+    # zero inclination, zero RAAN ---------------------------------------------------------------------------------------------
+
+    def test_equatorial_t0_points_along_x(self):
+        """Zero inclination, zero RAAN, true anomaly = 0 -> position along +x."""
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, 0, 0, 0, iss_mean_motion, 0
+        )
+        assert allclose((x, y, z), (iss_orbital_radius, 0.0, 0.0))
+
+    def test_equitorial_true_anomaly_90_points_along_y(self):
+        """Zero inclination, zero RAAN, true anomaly = π/2 -> position along +y."""
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, 0, 0, pi / 2, iss_mean_motion, 0
+        )
+        assert allclose((x, y, z), (0.0, iss_orbital_radius, 0.0))
+
+    def test_equatorial_stays_in_xy_plane(self):
+        """Zero inclination orbit never leaves the equitorial plane (z=0)."""
+        for t in [0, 500, 1000, 2000]:
+            x, y, z = orbit_engine._position_eci(
+                iss_orbital_radius, 0, 0, 0, iss_mean_motion, t
+            )
+            assert isclose(z, 0.0, abs_tol=1e-6)
+
+    # inclination -------------------------------------------------------------------------------------------------------------
+
+    def test_polar_orbit_reaches_north_pole(self):
+        """inclination = 90°, true anomaly = π/2 -> satellite directly over north pole (+z)."""
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, pi / 2, 0, pi / 2, iss_mean_motion, 0
+        )
+        assert allclose((x, y, z), (0.0, 0.0, iss_orbital_radius))
+
+    def test_polar_orbit_reaches_south_pole(self):
+        """inclination = 90°, true anomaly = 3π/2 → satellite directly over south pole (-z)."""
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, pi / 2, 0, 3 * pi / 2, iss_mean_motion, 0
+        )
+        assert allclose((x, y, z), (0.0, 0.0, -iss_orbital_radius), rel_tol=1e-9)
+
+    def test_inclination_max_z(self):
+        """Maximum z reached equals radius * sin(inclination)."""
+        inc = radians(51.6)
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, inc, 0, pi / 2, iss_mean_motion, 0
+        )
+        assert isclose(z, iss_orbital_radius * sin(inc), rel_tol=1e-9)
+
+    # RAAN --------------------------------------------------------------------------------------------------------------------
+
+    def test_raan_90_rotates_ascending_node(self):
+        """RAAN = π/2 rotates the orbit 90° around z - ascending node moves to +y axis."""
+        x, y, z = orbit_engine._position_eci(
+            iss_orbital_radius, 0, pi / 2, 0, iss_mean_motion, 0
+        )
+        assert allclose((x, y, z), (0.0, iss_orbital_radius, 0.0))
+
+    def test_raan_does_not_affect_z(self):
+        """RAAN rotation is around z, so z component is unchanged."""
+        z_ref = orbit_engine._position_eci(
+            iss_orbital_radius, radians(51.6), 0, pi / 2, iss_mean_motion, 0
+        )[2]
+        z_rot = orbit_engine._position_eci(
+            iss_orbital_radius, radians(51.6), pi / 3, pi / 2, iss_mean_motion, 0
+        )[2]
+        assert isclose(z_ref, z_rot, rel_tol=1e-9)
