@@ -1,5 +1,6 @@
 from math import isclose, pi, sqrt, radians, sin
 from sat_thermal import orbit_engine
+from constants import EARTH_RADIUS_M
 
 
 def magnitude(v):
@@ -161,3 +162,65 @@ class TestPositionECI:
             iss_orbital_radius, radians(51.6), pi / 3, pi / 2, iss_mean_motion, 0
         )[2]
         assert isclose(z_ref, z_rot, rel_tol=1e-9)
+
+
+# -- tests _in_cylindrical_eclipse() ------------------------------------------------------------------------------------------
+
+
+class TestInCylindricalEclipse:
+
+    # sun-side early exit --------------------------------------------------------------------------
+
+    def test_directly_toward_sun_is_sunlit(self):
+        """Satellite directly between Earth and Sun is not in eclipse."""
+        assert not orbit_engine._in_cylindrical_eclipse((8e6, 0, 0), (1, 0, 0))
+
+    def test_on_sun_axis_positive_is_sunlit(self):
+        """Any positive projection onto sun axis returns False immediately."""
+        assert not orbit_engine._in_cylindrical_eclipse((4e6, 4e6, 0), (1, 0, 0))
+
+    def test_at_origin_projection_zero_is_sunlit(self):
+        """Zero projection (perpendicular to sun) is treated as sunlit."""
+        assert not orbit_engine._in_cylindrical_eclipse((0, 8e6, 0), (1, 0, 0))
+
+    # on shadow axis -------------------------------------------------------------------------------
+
+    def test_directly_behind_earth_is_eclipse(self):
+        """Satellite directly behind Earth on shadow axis is in eclipse."""
+        assert orbit_engine._in_cylindrical_eclipse((-8e6, 0, 0), (1, 0, 0))
+
+    def test_far_behind_earth_is_eclipse(self):
+        """Satellite far behind Earth but still on axis is in eclipse."""
+        assert orbit_engine._in_cylindrical_eclipse((-40e6, 0, 0), (1, 0, 0))
+
+    # cylinder boundary ----------------------------------------------------------------------------
+
+    def test_beside_earth_outside_cylinder_is_sunlit(self):
+        """Satellite beside Earth with perpendicular distance > R is sunlit."""
+        assert not orbit_engine._in_cylindrical_eclipse((0, 8e6, 0), (1, 0, 0))
+
+    def test_just_outside_cylinder_is_sunlit(self):
+        """Satellite just outside the shadow cylinder is sunlit."""
+        assert not orbit_engine._in_cylindrical_eclipse(
+            (-8e6, EARTH_RADIUS_M * 1.01, 0), (1, 0, 0)
+        )
+
+    def test_just_inside_cylinder_is_eclipse(self):
+        """Satellite just inside the shadow cylinder is in eclipse."""
+        assert orbit_engine._in_cylindrical_eclipse(
+            (-8e6, EARTH_RADIUS_M * 0.99, 0), (1, 0, 0)
+        )
+
+    # sun direction independence -------------------------------------------------------------------
+
+    def test_eclipse_with_sun_along_y_axis(self):
+        """Eclipse check works regardless of sun direction — sun along +y."""
+        assert orbit_engine._in_cylindrical_eclipse((0, -8e6, 0), (0, 1, 0))
+
+    def test_eclipse_with_sun_along_z_axis(self):
+        """Eclipse check works regardless of sun direction — sun along +z."""
+        assert orbit_engine._in_cylindrical_eclipse((0, 0, -8e6), (0, 0, 1))
+
+    def test_sunlit_with_sun_along_y_axis(self):
+        """Sunlit check works regardless of sun direction — sun along +y."""
+        assert not orbit_engine._in_cylindrical_eclipse((0, 8e6, 0), (0, 1, 0))
