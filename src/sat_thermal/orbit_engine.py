@@ -1,5 +1,14 @@
+from dataclasses import dataclass
 from math import cos, sin, radians, pi, sqrt
 from constants import EARTH_RADIUS_M, EARTH_MU_M3_S2
+
+
+@dataclass(frozen=True)
+class OrbitState:
+    t_s: float
+    position_m: tuple[float, float, float]
+    sun_vector: tuple[float, float, float]
+    in_eclipse: bool
 
 
 def _sun_unit_vector(ra_rad, dec_rad):
