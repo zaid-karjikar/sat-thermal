@@ -1,7 +1,7 @@
 import pytest
 from math import isclose, pi, sqrt, radians, sin
 from sat_thermal import orbit_engine
-from constants import EARTH_RADIUS_M
+from sat_thermal.constants import EARTH_RADIUS_M
 from sat_thermal.orbit_engine import Orbit, OrbitState
 
 

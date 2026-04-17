@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from math import cos, sin, radians, pi, sqrt
-from constants import EARTH_RADIUS_M, EARTH_MU_M3_S2
+from .constants import EARTH_RADIUS_M, EARTH_MU_M3_S2
 
 
 @dataclass(frozen=True)
