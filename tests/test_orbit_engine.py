@@ -107,7 +107,7 @@ class TestPositionECI:
         )
         assert allclose((x, y, z), (iss_orbital_radius, 0.0, 0.0))
 
-    def test_equitorial_true_anomaly_90_points_along_y(self):
+    def test_equatorial_true_anomaly_90_points_along_y(self):
         """Zero inclination, zero RAAN, true anomaly = π/2 -> position along +y."""
         x, y, z = orbit_engine._position_eci(
             iss_orbital_radius, 0, 0, pi / 2, iss_mean_motion, 0
@@ -115,7 +115,7 @@ class TestPositionECI:
         assert allclose((x, y, z), (0.0, iss_orbital_radius, 0.0))
 
     def test_equatorial_stays_in_xy_plane(self):
-        """Zero inclination orbit never leaves the equitorial plane (z=0)."""
+        """Zero inclination orbit never leaves the equatorial plane (z=0)."""
         for t in [0, 500, 1000, 2000]:
             x, y, z = orbit_engine._position_eci(
                 iss_orbital_radius, 0, 0, 0, iss_mean_motion, t
